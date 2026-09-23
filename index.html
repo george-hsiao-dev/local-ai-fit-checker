@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Local AI Fit Checker</title>
   <meta name="description" content="Estimate whether a quantized local language model fits your GPU and system memory.">
+  <link rel="canonical" href="https://george-hsiao-dev.github.io/local-ai-fit-checker/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Local AI Fit Checker">
+  <meta property="og:description" content="Estimate model weights, KV cache, and memory headroom before buying hardware or downloading a huge model.">
+  <meta property="og:url" content="https://george-hsiao-dev.github.io/local-ai-fit-checker/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root{--bg:#07111d;--panel:#0e1d2d;--panel2:#12263a;--line:#24425d;--text:#eef7ff;--muted:#9bb0c4;--cyan:#39d6e8;--green:#4ee09a;--amber:#ffcb66;--red:#ff7185}
     *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 85% 0,#153852 0,transparent 35%),var(--bg);color:var(--text);font:16px/1.5 Inter,Segoe UI,Arial,sans-serif}
@@ -13,11 +19,12 @@
     .grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(340px,.95fr);gap:22px;margin-top:34px}.panel{background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 18px 60px #0005}
     h2{margin:0 0 18px;font-size:1.15rem}.fields{display:grid;grid-template-columns:1fr 1fr;gap:15px}.field{display:flex;flex-direction:column;gap:7px}.wide{grid-column:1/-1}
     label{font-size:.84rem;color:#c6d5e3;font-weight:700}.hint{font-size:.76rem;color:var(--muted);font-weight:400} input,select{width:100%;border:1px solid var(--line);background:#071522;color:var(--text);border-radius:10px;padding:12px 13px;font:inherit;outline:none} input:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px #39d6e820}
+    .presets{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.preset{border:1px solid var(--line);background:#071522;color:#cfe2f0;border-radius:999px;padding:7px 11px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer}.preset:hover,.preset:focus{border-color:var(--cyan);color:white}
     details{margin-top:16px;border-top:1px solid var(--line);padding-top:15px} summary{cursor:pointer;color:var(--cyan);font-weight:700}.advanced{margin-top:15px}
     .result-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.badge{border-radius:999px;padding:7px 11px;font-weight:800;font-size:.78rem;background:#17344a;color:var(--cyan)}
     .verdict{font-size:1.9rem;line-height:1.08;margin:10px 0 8px}.explain{color:var(--muted);min-height:48px}.meter{height:16px;border-radius:99px;background:#06111b;overflow:hidden;margin:22px 0 8px;border:1px solid var(--line)}.meter>div{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan));transition:width .25s}
     .meter-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:.75rem}.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:18px 0}.stat{background:#091827;border:1px solid var(--line);border-radius:12px;padding:13px}.stat b{display:block;font-size:1.32rem}.stat span{color:var(--muted);font-size:.78rem}
-    .recommend{background:#091827;border-left:3px solid var(--cyan);padding:13px 15px;border-radius:8px;color:#cfe2f0}.recommend strong{color:white}.note{margin-top:17px;color:var(--muted);font-size:.78rem}
+    .recommend{background:#091827;border-left:3px solid var(--cyan);padding:13px 15px;border-radius:8px;color:#cfe2f0}.recommend strong{color:white}.result-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.small-action{border:1px solid var(--line);background:#071522;color:var(--text);border-radius:9px;padding:9px 12px;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer}.small-action:hover{border-color:var(--cyan)}.note{margin-top:17px;color:var(--muted);font-size:.78rem}
     .evidence{margin-top:22px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.evidence div{padding:15px;border:1px solid var(--line);border-radius:13px;background:#0a1725}.evidence b{display:block;color:var(--cyan);margin-bottom:4px}.evidence span{color:var(--muted);font-size:.84rem}
     .cta{margin-top:22px;display:flex;align-items:center;justify-content:space-between;gap:18px}.cta p{margin:4px 0 0;color:var(--muted)}.actions{display:flex;gap:10px;flex-wrap:wrap}.button{display:inline-block;padding:11px 15px;border-radius:10px;border:1px solid var(--line);color:var(--text);text-decoration:none;font-weight:800;white-space:nowrap}.button.primary{background:var(--cyan);border-color:var(--cyan);color:#05202a}.button:hover{filter:brightness(1.08)}
     footer{margin-top:34px;color:#6f879b;font-size:.78rem} @media(max-width:820px){.grid{grid-template-columns:1fr}.evidence{grid-template-columns:1fr}.cta{align-items:flex-start;flex-direction:column}} @media(max-width:520px){.fields,.stats{grid-template-columns:1fr}.wide{grid-column:auto}.panel{padding:17px}}
@@ -31,6 +38,7 @@
   <section class="grid">
     <form class="panel" id="calc">
       <h2>Your model and machine</h2>
+      <div class="presets" aria-label="Model size presets"><button class="preset" type="button" data-preset="8">8B</button><button class="preset" type="button" data-preset="14">14B</button><button class="preset" type="button" data-preset="32">32B</button><button class="preset" type="button" data-preset="70">70B</button></div>
       <div class="fields">
         <div class="field"><label for="params">Model size <span class="hint">billions of parameters</span></label><input id="params" type="number" min="0.5" max="1000" step="0.5" value="14"></div>
         <div class="field"><label for="bits">Quantization</label><select id="bits"><option value="2">2-bit</option><option value="3">3-bit</option><option value="4" selected>4-bit</option><option value="5">5-bit</option><option value="6">6-bit</option><option value="8">8-bit</option><option value="16">FP16 / BF16</option></select></div>
@@ -51,16 +59,19 @@
       <div class="result-head"><div><div class="eyebrow">Estimated result</div><h2 class="verdict" id="verdict">Calculating…</h2></div><span class="badge" id="badge">—</span></div>
       <p class="explain" id="explain"></p><div class="meter"><div id="bar"></div></div><div class="meter-labels"><span id="usedLabel"></span><span id="capacityLabel"></span></div>
       <div class="stats"><div class="stat"><b id="weights">—</b><span>Model weights</span></div><div class="stat"><b id="kv">—</b><span>KV cache</span></div><div class="stat"><b id="headroom">—</b><span>Runtime headroom</span></div><div class="stat"><b id="total">—</b><span>Total estimate</span></div></div>
-      <div class="recommend" id="recommend"></div><p class="note">Estimate for llama.cpp-style inference. Real usage varies by architecture, backend, batch size, cache type, drivers, and GPU split. Check the model card before buying hardware.</p>
+      <div class="recommend" id="recommend"></div><div class="result-actions"><button class="small-action" type="button" id="copyResult">Copy result</button><button class="small-action" type="button" id="copyLink">Copy share link</button></div><p class="note">Estimate for llama.cpp-style inference. Real usage varies by architecture, backend, batch size, cache type, drivers, and GPU split. Check the model card before buying hardware.</p>
     </section>
   </section>
   <section class="evidence"><div><b>Weights</b><span>Parameters × quantization bits, plus a small metadata allowance.</span></div><div><b>Context</b><span>KV cache estimate based on layers, hidden size, grouped-query ratio, and context length.</span></div><div><b>Headroom</b><span>Extra memory reserved for runtime buffers so “barely fits” is not called safe.</span></div></section>
-  <section class="panel cta"><div><div class="eyebrow">Need a decision, not another estimate?</div><h2 style="margin:6px 0 0">Get a custom model and hardware fit analysis</h2><p>Send your model shortlist, hardware, budget, and workload. I’ll turn it into a practical recommendation.</p></div><div class="actions"><a class="button primary" href="https://www.fiverr.com/george_hsiao" target="_blank" rel="noopener">Hire me on Fiverr</a><a class="button" href="https://github.com/george-hsiao-dev/local-ai-fit-checker/issues/new" target="_blank" rel="noopener">Send feedback</a></div></section>
+  <section class="panel cta"><div><div class="eyebrow">Need a decision, not another estimate?</div><h2 style="margin:6px 0 0">Get a custom model and hardware fit analysis</h2><p>Send your model shortlist, hardware, budget, and workload. I’ll turn it into a practical recommendation.</p></div><div class="actions"><a class="button primary" href="https://www.fiverr.com/george_hsiao" target="_blank" rel="noopener">Hire me on Fiverr</a><a class="button" id="feedback" href="https://github.com/george-hsiao-dev/local-ai-fit-checker/issues/new" target="_blank" rel="noopener">Send feedback</a></div></section>
   <footer>Local AI Fit Checker · Calculation stays on this device · v0.1 experimental estimate</footer>
 </main>
 <script>
 const $=id=>document.getElementById(id), ids=['params','bits','context','vram','ram','backend','fileSize','layers','hidden','kvRatio','cacheBytes'];
 function n(id){return Math.max(0,Number($(id).value)||0)} function gb(x){return x.toFixed(x<10?2:1)+' GB'}
+function snapshot(){return `Local AI Fit Checker\nModel: ${$('params').value}B, ${$('bits').value}-bit, ${$('context').value} context\nMachine: ${$('vram').value} GB GPU, ${$('ram').value} GB RAM, ${$('backend').selectedOptions[0].text}\nResult: ${$('verdict').textContent} — ${$('total').textContent} estimated`}
+function shareUrl(){const u=new URL(location.href);ids.forEach(id=>{const value=$(id).value;if(value)u.searchParams.set(id,value);else u.searchParams.delete(id)});return u.toString()}
+async function copyText(text,button){try{await navigator.clipboard.writeText(text);const old=button.textContent;button.textContent='Copied';setTimeout(()=>button.textContent=old,1400)}catch{window.prompt('Copy this:',text)}}
 function calc(){
   const params=n('params'),bits=n('bits'),ctx=n('context'),vram=n('vram'),ram=n('ram'),backend=$('backend').value;
   const rawWeights=params*1e9*bits/8/1073741824; const weights=n('fileSize')||rawWeights*1.08;
@@ -74,7 +85,9 @@ function calc(){
   $('verdict').textContent=verdict;$('badge').textContent=badge;$('explain').textContent=explain;$('weights').textContent=gb(weights);$('kv').textContent=gb(kv);$('headroom').textContent=gb(head);$('total').textContent=gb(total);$('usedLabel').textContent=gb(total)+' estimated';$('capacityLabel').textContent=gb(capacity)+' safe capacity';
   const fits=[2,3,4,5,6,8,16].filter(b=>{const w=params*1e9*b/8/1073741824*1.08;return w+kv+Math.max(1.2,w*.10)<=capacity});
   $('recommend').innerHTML=fits.length?'<strong>Quantizations likely to fit:</strong> '+fits.map(x=>x+'-bit').join(', '):'<strong>No listed quantization has comfortable headroom.</strong> Reduce context or choose a smaller model.';
+  const issueBody=encodeURIComponent(snapshot()+'\n\nWhat looked wrong or what should be added?\n');$('feedback').href='https://github.com/george-hsiao-dev/local-ai-fit-checker/issues/new?title='+encodeURIComponent('Fit estimate feedback')+'&body='+issueBody;
 }
-ids.forEach(id=>$(id).addEventListener('input',calc)); $('params').addEventListener('change',()=>{const p=n('params');if(p<=8){$('layers').value=32;$('hidden').value=4096;$('kvRatio').value=.25}else if(p<=20){$('layers').value=40;$('hidden').value=5120;$('kvRatio').value=.2}else if(p<=40){$('layers').value=64;$('hidden').value=5120;$('kvRatio').value=.125}else{$('layers').value=80;$('hidden').value=8192;$('kvRatio').value=.125}calc()});calc();
+function setModel(p){$('params').value=p;if(p<=8){$('layers').value=32;$('hidden').value=4096;$('kvRatio').value=.25}else if(p<=20){$('layers').value=40;$('hidden').value=5120;$('kvRatio').value=.2}else if(p<=40){$('layers').value=64;$('hidden').value=5120;$('kvRatio').value=.125}else{$('layers').value=80;$('hidden').value=8192;$('kvRatio').value=.125}calc()}
+const query=new URLSearchParams(location.search);ids.forEach(id=>{if(query.has(id))$(id).value=query.get(id)});ids.forEach(id=>$(id).addEventListener('input',calc));$('params').addEventListener('change',()=>setModel(n('params')));document.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>setModel(Number(button.dataset.preset))));$('copyResult').addEventListener('click',event=>copyText(snapshot(),event.currentTarget));$('copyLink').addEventListener('click',event=>copyText(shareUrl(),event.currentTarget));calc();
 </script>
 </body></html>
