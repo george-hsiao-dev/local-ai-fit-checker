@@ -8,6 +8,6 @@ The estimate combines model weights, a configurable KV-cache approximation, and 
 
 ## Custom analysis
 
-Need a model shortlist or a hardware recommendation for a specific workload? [Hire me on Fiverr](https://www.fiverr.com/george_hsiao).
+Need a model shortlist or a hardware recommendation for a specific workload? [Hire me on Fiverr](https://www.fiverr.com/s/p3d86wy).
 
 Found a bad estimate or want another input? [Open an issue](https://github.com/george-hsiao-dev/local-ai-fit-checker/issues/new).
